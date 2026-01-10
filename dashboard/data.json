@@ -1,0 +1,19 @@
+{
+  "totalRunbooks": 1,
+  "staleRunbooks": 0,
+  "totalAnnotations": 0,
+  "avgResolutionTime": 24.5,
+  "incidentsByService": {
+    "service-x": 0
+  },
+  "usageByService": {
+    "service-x": 1
+  },
+  "topFixes": [],
+  "runbookAges": [
+    {
+      "label": "0-30 days",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+name: Process Runbook Annotations
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  process-annotation:
+    if: ${{ contains(github.event.comment.body, '/annotate') || contains(github.event.comment.body, '/runbook-update') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      
+      - name: Parse annotation command
+        id: parse
+        run: |
+          # Extract annotation details from the comment
+          COMMENT="${{ github.event.comment.body }}"
+          
+          # Example format: /annotate INC-123 --cause "Memory leak" --fix "Increased limits"
+          if [[ $COMMENT =~ /annotate[[:space:]]+([A-Z0-9-]+)[[:space:]]+--cause[[:space:]]+"([^"]+)"[[:space:]]+--fix[[:space:]]+"([^"]+)" ]]; then
+            INCIDENT_ID="${BASH_REMATCH[1]}"
+            CAUSE="${BASH_REMATCH[2]}"
+            FIX="${BASH_REMATCH[3]}"
+            
+            echo "incident_id=$INCIDENT_ID" >> $GITHUB_OUTPUT
+            echo "cause=$CAUSE" >> $GITHUB_OUTPUT
+            echo "fix=$FIX" >> $GITHUB_OUTPUT
+            
+            # Extract runbook path from issue title or labels
+            RUNBOOK_PATH="runbooks/service-x/runbook.yaml"
+            echo "runbook_path=$RUNBOOK_PATH" >> $GITHUB_OUTPUT
+          else
+            echo "Could not parse annotation command"
+            exit 1
+          fi
+      
+      - name: Update runbook with annotation
+        run: |
+          python runbooks/service-x/scripts/annotate_incident.py \
+            --runbook "${{ steps.parse.outputs.runbook_path }}" \
+            --incident "${{ steps.parse.outputs.incident_id }}" \
+            --cause "${{ steps.parse.outputs.cause }}" \
+            --fix "${{ steps.parse.outputs.fix }}"
+      
+      - name: Create pull request
+        run: |
+          git config --global user.name 'Runbook Bot'
+          git config --global user.email 'bot@example.com'
+          
+          BRANCH_NAME="annotation-${{ steps.parse.outputs.incident_id }}-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH_NAME"
+          
+          git add "${{ steps.parse.outputs.runbook_path }}"
+          git commit -m "Add annotation for ${{ steps.parse.outputs.incident_id }} [skip ci]"
+          git push origin "$BRANCH_NAME"
+          
+          gh pr create \
+            --title "Add annotation for ${{ steps.parse.outputs.incident_id }}" \
+            --body "Automatically added annotation from issue comment.\n\nIncident: ${{ steps.parse.outputs.incident_id }}\nCause: ${{ steps.parse.outputs.cause }}\nFix: ${{ steps.parse.outputs.fix }}" \
+            --head "$BRANCH_NAME" \
+            --base main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

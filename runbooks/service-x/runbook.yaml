@@ -1,0 +1,14 @@
+title: "Service X Outage Runbook"
+version: "1.2"
+last_updated: "2026-01-04"
+owner: "team-x"
+triggers: ["high_cpu", "5xx_errors"]
+steps:
+  - check: "Verify alert in Datadog"
+    command: "datadog alert list --filter 'service:x'"
+    automation: "scripts/check_datadog.py"
+  - diagnose: "Check recent deployments"
+    command: "kubectl rollout history -n prod"
+    automation: "scripts/check_deployments.sh"
+annotations: []
+diagnostics: []
