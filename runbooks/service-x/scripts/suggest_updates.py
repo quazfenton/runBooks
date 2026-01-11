@@ -77,7 +77,7 @@ def extract_canonical_fixes(text: str) -> List[str]:
 def analyze_runbook_annotations(runbook_path: Path) -> Dict[str, any]:
     """Analyze annotations in a runbook to extract patterns."""
     with open(runbook_path, 'r') as f:
-        runbook = yaml.safe_load(f)
+    runbook = yaml.safe_load(f) or {}
     
     annotations = runbook.get('annotations', [])
     
