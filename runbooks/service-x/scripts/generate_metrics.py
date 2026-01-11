@@ -16,7 +16,7 @@ import argparse
 
 def get_runbook_age(runbook_path):
     """Calculate the age of a runbook based on its last updated field."""
-    with open(runbook_path, 'r') as f:
+    with open(runbook_path, 'r', encoding='utf-8') as f:
         runbook = yaml.safe_load(f)
     
     last_updated_str = runbook.get('last_updated')
