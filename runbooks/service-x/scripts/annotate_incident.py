@@ -16,7 +16,7 @@ def annotate_runbook(runbook_path, incident_id, cause, fix, symptoms=None, runbo
     
     annotation = {
         "incident_id": incident_id,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(datetime.timezone.utc).isoformat(),
         "cause": cause,
         "fix": fix
     }
