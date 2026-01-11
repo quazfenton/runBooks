@@ -48,7 +48,7 @@ def generate_result_hash(result_blob):
 def append_diagnostic_to_runbook(runbook_path, diagnostic_data):
     """Append diagnostic data to runbook YAML."""
     with open(runbook_path, "r") as f:
-        runbook = yaml.safe_load(f)
+        runbook = yaml.safe_load(f) or {}
     
     # Create diagnostic record following the schema
     diagnostic_record = {
