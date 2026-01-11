@@ -31,7 +31,7 @@ jobs:
       - name: Create or update PR if needed
         run: |
           # Check if there are any suggestions
-          if [ -s suggestions.json ] && [ "$(jq length suggestions.json)" -gt 0 ]; then
+          if [ -s suggestions.json ] && [ "$(jq 'length' < suggestions.json)" -gt 0 ]; then
             echo "Found suggestions, creating PR..."
             
             # Create a new branch
