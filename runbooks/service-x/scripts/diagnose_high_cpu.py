@@ -20,7 +20,7 @@ def get_top_processes(limit=10):
     try:
         result = subprocess.run(
             ["ps", "-eo", "pid,%cpu,comm", "--sort=-%cpu", "--no-headers"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=10, check=True
         )
         
         processes = []

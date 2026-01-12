@@ -31,7 +31,7 @@ def create_annotation_from_slack_payload(payload: Dict[str, Any]) -> Dict[str, A
     
     annotation = {
         "incident_id": incident_id,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "cause": root_cause,
         "fix": fix_applied
     }

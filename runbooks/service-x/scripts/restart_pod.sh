@@ -26,7 +26,7 @@ kubectl -n "$NAMESPACE" get pod "$POD" -o wide >> "$RUNBOOK_PATH" 2>&1 || echo "
 echo "" >> "$RUNBOOK_PATH"
 
 # Delete the pod to trigger restart
-kubectl -n "$NAMESPACE" delete pod "$POD" --wait=false
+kubectl -n "$NAMESPACE" delete pod "$POD" --wait=false 2>&1 || { echo "Error: Failed to delete pod $POD" >> "$RUNBOOK_PATH"; exit 1; }
 
 # Log the action in the runbook
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
