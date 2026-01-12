@@ -73,6 +73,6 @@ jobs:
             --title "Add annotation for ${{ steps.parse.outputs.incident_id }}" \
             --body "Automatically added annotation from issue comment.\n\nIncident: ${{ steps.parse.outputs.incident_id }}\nCause: ${{ steps.parse.outputs.cause }}\nFix: ${{ steps.parse.outputs.fix }}" \
             --head "$BRANCH_NAME" \
-            --base main
+            --base master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

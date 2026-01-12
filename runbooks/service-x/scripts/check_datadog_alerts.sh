@@ -22,8 +22,11 @@ fi
 # Fetch active alerts for the service
 echo "Fetching Datadog alerts for service: $SERVICE"
 
+# URL-encode the service name
+SERVICE_ENCODED=$(printf %s "$SERVICE" | jq -sRr @uri)
+
 response=$(curl -s -X GET \
-  "https://api.datadoghq.com/api/v1/monitor?group_states=alert,warn,no%20data&tags=service:$SERVICE" \
+  "https://api.datadoghq.com/api/v1/monitor?group_states=alert,warn,no%20data&tags=service:$SERVICE_ENCODED" \
   -H "Content-Type: application/json" \
   -H "DD-API-KEY: $API_KEY" \
   -H "DD-APPLICATION-KEY: $APP_KEY")

@@ -18,7 +18,7 @@ def load_diagnostics_from_runbook(runbook_path: Path) -> List[Dict[str, Any]]:
     with open(runbook_path, 'r') as f:
         runbook = yaml.safe_load(f)
     
-    return runbook.get('diagnostics', [])
+    return (runbook or {}).get('diagnostics', [])
 
 
 def find_similar_diagnostics(
