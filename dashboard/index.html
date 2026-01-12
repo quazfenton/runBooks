@@ -203,7 +203,7 @@
         // Top fixes chart
         const fixesCtx = document.getElementById('fixesChart').getContext('2d');
         new Chart(fixesCtx, {
-            type: 'horizontalBar',
+            type: 'bar',
             data: {
                 labels: sampleData.topFixes.map(item => item.name),
                 datasets: [{
