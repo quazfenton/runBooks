@@ -55,22 +55,75 @@ flock -x 200 || exit 1
 # Check if the heading already exists to avoid duplicates (inside lock)
 HEADING_EXISTS=$(grep -c "^## Active Datadog Alerts for $SERVICE$" "$RUNBOOK_PATH" || true)
 
-# Create a temporary file for atomic write
-TEMP_FILE=$(mktemp)
-cp "$RUNBOOK_PATH" "$TEMP_FILE"
+# Check if the runbook is in YAML format (by extension or front matter)
+if [[ "$RUNBOOK_PATH" =~ \.ya?ml$ ]] || head -n 1 "$RUNBOOK_PATH" | grep -q '^---'; then
+    # Handle YAML format by adding alerts as structured data
+    TEMP_FILE=$(mktemp)
+    cp "$RUNBOOK_PATH" "$TEMP_FILE"
 
-if [ -n "$alerts" ]; then
-    if [ "$HEADING_EXISTS" -eq 0 ]; then
-        echo "## Active Datadog Alerts for $SERVICE" >> "$TEMP_FILE"
-    fi
-    echo "$alerts" >> "$TEMP_FILE"
+    # Use Python to update the YAML file with alerts data
+    python3 -c "
+import sys
+import yaml
+import json
+from datetime import datetime
+
+if len(sys.argv) != 4:
+    print('Usage: python3 script.py <input_file> <output_file> <alerts>')
+    sys.exit(1)
+
+input_file, output_file, alerts_str = sys.argv[1], sys.argv[2], sys.argv[3]
+service = '$SERVICE'
+heading_exists = $HEADING_EXISTS
+
+# Parse alerts string - split by newlines
+alerts_list = [line.strip() for line in alerts_str.split('\n') if line.strip()]
+
+# Load existing YAML
+with open(input_file, 'r') as f:
+    data = yaml.safe_load(f)
+
+# Add or update datadog_alerts section
+if data is None:
+    data = {}
+
+# Prepare alert data
+alert_data = {
+    'timestamp': datetime.utcnow().isoformat(),
+    'service': service,
+    'alerts_found': len(alerts_list) > 0 and alerts_list != ['No active alerts found.'],
+    'alerts': alerts_list if len(alerts_list) > 0 and alerts_list != ['No active alerts found.'] else []
+}
+
+if 'datadog_alerts' not in data:
+    data['datadog_alerts'] = []
+
+# Add this check to the list
+data['datadog_alerts'].append(alert_data)
+
+# Write back to file
+with open(output_file, 'w') as f:
+    yaml.dump(data, f, default_flow_style=False)
+" "$RUNBOOK_PATH" "$TEMP_FILE" "$alerts"
     echo "$alerts"
 else
-    echo "No active alerts found for service: $SERVICE"
-    if [ "$HEADING_EXISTS" -eq 0 ]; then
-        echo "## Active Datadog Alerts for $SERVICE" >> "$TEMP_FILE"
+    # Handle Markdown format by appending headings
+    TEMP_FILE=$(mktemp)
+    cp "$RUNBOOK_PATH" "$TEMP_FILE"
+
+    if [ -n "$alerts" ]; then
+        if [ "$HEADING_EXISTS" -eq 0 ]; then
+            echo "## Active Datadog Alerts for $SERVICE" >> "$TEMP_FILE"
+        fi
+        echo "$alerts" >> "$TEMP_FILE"
+        echo "$alerts"
+    else
+        echo "No active alerts found for service: $SERVICE"
+        if [ "$HEADING_EXISTS" -eq 0 ]; then
+            echo "## Active Datadog Alerts for $SERVICE" >> "$TEMP_FILE"
+        fi
+        echo "No active alerts found." >> "$TEMP_FILE"
     fi
-    echo "No active alerts found." >> "$TEMP_FILE"
 fi
 
 # Atomically replace the original file

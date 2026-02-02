@@ -120,12 +120,17 @@ jobs:
           pip install pyyaml
 
       - name: Update runbook with annotation
+        env:
+          RUNBOOK_PATH: ${{ inputs.runbook_path }}
+          INCIDENT_ID: ${{ inputs.incident_id }}
+          CAUSE: ${{ inputs.cause }}
+          FIX: ${{ inputs.fix }}
         run: |
           python runbooks/service-x/scripts/annotate_incident.py \
-            --runbook "${{ inputs.runbook_path }}" \
-            --incident "${{ inputs.incident_id }}" \
-            --cause "${{ inputs.cause }}" \
-            --fix "${{ inputs.fix }}"
+            --runbook "$RUNBOOK_PATH" \
+            --incident "$INCIDENT_ID" \
+            --cause "$CAUSE" \
+            --fix "$FIX"
 
       - name: Create pull request
         run: |
