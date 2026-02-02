@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Diagnostics Schema",
+  "description": "Schema for diagnostic data",
+  "required": ["timestamp", "source", "query", "result_blob"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when diagnostic was captured"
+    },
+    "source": {
+      "type": "string",
+      "description": "Source of the diagnostic data (e.g., kubectl, datadog, prometheus)"
+    },
+    "query": {
+      "type": "string",
+      "description": "Query that generated the diagnostic"
+    },
+    "result_hash": {
+      "type": "string",
+      "description": "Hash of the diagnostic result for comparison"
+    },
+    "result_blob": {
+      "type": "object",
+      "description": "Diagnostic result data in structured format"
+    },
+    "provenance": {
+      "type": "string",
+      "description": "How the diagnostic was captured (manual, automated, script)"
+    }
+  }
+}

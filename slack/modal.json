@@ -1,0 +1,124 @@
+{
+  "type": "modal",
+  "callback_id": "incident_annotation",
+  "title": {
+    "type": "plain_text",
+    "text": "Annotate Incident"
+  },
+  "submit": {
+    "type": "plain_text",
+    "text": "Submit"
+  },
+  "close": {
+    "type": "plain_text",
+    "text": "Cancel"
+  },
+  "blocks": [
+    {
+      "type": "input",
+      "block_id": "incident_id",
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "input",
+        "placeholder": {
+          "type": "plain_text",
+          "text": "e.g., INC-20260104-001"
+        },
+        "max_length": 100
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Incident ID"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "symptoms",
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "input",
+        "multiline": true,
+        "placeholder": {
+          "type": "plain_text",
+          "text": "Describe the symptoms observed..."
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Symptoms"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "root_cause",
+      "optional": true,
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "input",
+        "multiline": true,
+        "placeholder": {
+          "type": "plain_text",
+          "text": "What was the root cause?"
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Root Cause"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "fix_applied",
+      "optional": true,
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "input",
+        "multiline": true,
+        "placeholder": {
+          "type": "plain_text",
+          "text": "What fix was applied?"
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Fix Applied"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "runbook_gaps",
+      "optional": true,
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "input",
+        "multiline": true,
+        "placeholder": {
+          "type": "plain_text",
+          "text": "What was missing from the runbook?"
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Runbook Gaps"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "runbook_path",
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "input",
+        "placeholder": {
+          "type": "plain_text",
+          "text": "e.g., runbooks/service-x/runbook.yaml"
+        },
+        "min_length": 1,
+        "max_length": 3000
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Runbook Path"
+      }
+    }
+  ]
+}

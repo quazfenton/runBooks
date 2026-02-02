@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Runbook Schema",
+  "description": "Schema for Living Runbook structure",
+  "required": ["title", "version", "last_updated", "owner", "steps"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Title of the runbook"
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of the runbook"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last updated timestamp"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Team or person responsible for the runbook"
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Event types that trigger this runbook"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check", "command"],
+        "properties": {
+          "check": {
+            "type": "string",
+            "description": "Description of the check to perform"
+          },
+          "command": {
+            "type": "string",
+            "description": "Command to execute"
+          },
+          "automation": {
+            "type": "string",
+            "description": "Path to automation script"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the step"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "$ref": "schemas/annotation.schema.json"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "schemas/diagnostics.schema.json"
+      }
+    }
+  }
+}

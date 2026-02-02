@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Action Record Schema",
+  "description": "Schema for recording automated and manual actions",
+  "required": ["timestamp", "actor", "command", "status"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when action was executed"
+    },
+    "actor": {
+      "type": "string",
+      "description": "Who performed the action (human username or automation name)"
+    },
+    "command": {
+      "type": "string",
+      "description": "Command that was executed"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failure", "pending"],
+      "description": "Status of the action"
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Risk level of the action"
+    },
+    "auto_run": {
+      "type": "boolean",
+      "description": "Whether the action was run automatically"
+    },
+    "dry_run": {
+      "type": "boolean",
+      "description": "Whether this was a dry-run execution"
+    },
+    "rollback_command": {
+      "type": "string",
+      "description": "Command to rollback this action"
+    },
+    "result": {
+      "type": "string",
+      "description": "Result or output of the action"
+    }
+  }
+}
