@@ -159,7 +159,7 @@ def main():
         }
     else:
         print(f"Unknown diagnostic source: {args.source}")
-        return
+        exit(1)
     
     diagnostic_record = create_diagnostic_record(
         source=args.source,
