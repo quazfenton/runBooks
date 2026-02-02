@@ -27,6 +27,8 @@ def verify_slack_signature(timestamp, signature, body):
 
     # Verify timestamp to prevent replay attacks (within 5 minutes)
     import time
+    if not timestamp or not timestamp.isdigit():
+        return False
     if abs(int(time.time()) - int(timestamp)) > 300:
         return False
 

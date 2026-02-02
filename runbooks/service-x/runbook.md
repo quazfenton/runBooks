@@ -17,7 +17,7 @@ Automation script: `scripts/check_datadog.py`
 
 ### 2. Check recent deployments
 ```bash
-kubectl rollout history deployment -n prod
+kubectl rollout history deployment <DEPLOYMENT_NAME> -n prod
 ```
 Automation script: `scripts/check_deployments.sh`
 

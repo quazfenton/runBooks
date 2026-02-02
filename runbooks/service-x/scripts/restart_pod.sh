@@ -19,8 +19,11 @@ if ! command -v kubectl &> /dev/null; then
 fi
 
 # Check if RUNBOOK_PATH is appropriate for appending Markdown
-if [ -d "$RUNBOOK_PATH" ] || [[ "$RUNBOOK_PATH" =~ \.(md|markdown)$ ]]; then
-    # OK to append to Markdown files or directories
+if [ -d "$RUNBOOK_PATH" ]; then
+    # If it's a directory, append to a default file inside it
+    RUNBOOK_PATH="$RUNBOOK_PATH/runbook.md"
+elif [[ "$RUNBOOK_PATH" =~ \.(md|markdown)$ ]]; then
+    # OK to append to Markdown files
     :
 else
     echo "Error: RUNBOOK_PATH ($RUNBOOK_PATH) is not a Markdown file or directory, refusing to modify."

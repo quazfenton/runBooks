@@ -150,7 +150,7 @@ def main():
             result_blob = json.loads(args.data)
         except json.JSONDecodeError as e:
             print(f"Error: Invalid JSON provided: {e}")
-            return
+            exit(1)
     elif args.source == "system":
         # Generate system diagnostics
         result_blob = {

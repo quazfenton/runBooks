@@ -48,12 +48,12 @@ fi
 # Extract alert IDs, names, and statuses
 alerts=$(echo "$response" | jq -r '.[] | "ID: \(.id) | Name: \(.name) | Status: \(.overall_state) | Priority: \(.priority)"')
 
-# Check if the heading already exists to avoid duplicates
-HEADING_EXISTS=$(grep -c "^## Active Datadog Alerts for $SERVICE$" "$RUNBOOK_PATH" || true)
-
 # Use file locking to prevent concurrent writes
 exec 200>"$RUNBOOK_PATH.lock"
 flock -x 200 || exit 1
+
+# Check if the heading already exists to avoid duplicates (inside lock)
+HEADING_EXISTS=$(grep -c "^## Active Datadog Alerts for $SERVICE$" "$RUNBOOK_PATH" || true)
 
 # Create a temporary file for atomic write
 TEMP_FILE=$(mktemp)

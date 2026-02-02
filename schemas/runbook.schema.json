@@ -55,10 +55,16 @@
       }
     },
     "annotations": {
-      "$ref": "schemas/annotation.schema.json"
+      "type": "array",
+      "items": {
+        "$ref": "schemas/annotation.schema.json"
+      }
     },
     "diagnostics": {
-      "$ref": "schemas/diagnostics.schema.json"
+      "type": "array",
+      "items": {
+        "$ref": "schemas/diagnostics.schema.json"
+      }
     }
   }
 }
