@@ -7,7 +7,7 @@ on:
 
 jobs:
   process-annotation:
-    if: ${{ contains(github.event.comment.body, '/annotate') || contains(github.event.comment.body, '/runbook-update') }}
+    if: ${{ github.event_name == 'issue_comment' && (contains(github.event.comment.body, '/annotate') || contains(github.event.comment.body, '/runbook-update')) || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -27,20 +27,24 @@ jobs:
       
       - name: Parse annotation command
         id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           # Extract annotation details from the comment
-          COMMENT="${{ github.event.comment.body }}"
-          
+          COMMENT="$COMMENT_BODY"
+
           # Example format: /annotate INC-123 --cause "Memory leak" --fix "Increased limits"
-          if [[ $COMMENT =~ /annotate[[:space:]]+([A-Z0-9-]+)[[:space:]]+--cause[[:space:]]+"([^"]+)"[[:space:]]+--fix[[:space:]]+"([^"]+)" ]]; then
-            INCIDENT_ID="${BASH_REMATCH[1]}"
-            CAUSE="${BASH_REMATCH[2]}"
-            FIX="${BASH_REMATCH[3]}"
-            
+          # Use safer pattern matching to avoid shell injection
+          if [[ "$COMMENT" =~ /annotate[[:space:]]+([A-Z0-9-]+)[[:space:]]+--cause[[:space:]]+"([^"]+)"[[:space:]]+--fix[[:space:]]+"([^"]+)" ]]; then
+            # Sanitize extracted values to prevent injection
+            INCIDENT_ID="${BASH_REMATCH[1]//[^A-Z0-9-]/}"
+            CAUSE="$(printf '%s' "${BASH_REMATCH[2]}" | sed 's/[^a-zA-Z0-9 _.-]//g')"
+            FIX="$(printf '%s' "${BASH_REMATCH[3]}" | sed 's/[^a-zA-Z0-9 _.-]//g')"
+
             echo "incident_id=$INCIDENT_ID" >> $GITHUB_OUTPUT
             echo "cause=$CAUSE" >> $GITHUB_OUTPUT
             echo "fix=$FIX" >> $GITHUB_OUTPUT
-            
+
             # Extract runbook path from issue title or labels
             RUNBOOK_PATH="runbooks/service-x/runbook.yaml"
             echo "runbook_path=$RUNBOOK_PATH" >> $GITHUB_OUTPUT

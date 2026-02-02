@@ -55,60 +55,10 @@
       }
     },
     "annotations": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["incident_id", "timestamp", "note", "fix"],
-        "properties": {
-          "incident_id": {
-            "type": "string",
-            "description": "ID of the incident"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Timestamp of the annotation"
-          },
-          "note": {
-            "type": "string",
-            "description": "Annotation note"
-          },
-          "fix": {
-            "type": "string",
-            "description": "Fix applied"
-          }
-        }
-      }
+      "$ref": "schemas/annotation.schema.json"
     },
     "diagnostics": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["timestamp", "source", "result"],
-        "properties": {
-          "timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Timestamp of the diagnostic"
-          },
-          "source": {
-            "type": "string",
-            "description": "Source of the diagnostic data"
-          },
-          "query": {
-            "type": "string",
-            "description": "Query that generated the diagnostic"
-          },
-          "result_hash": {
-            "type": "string",
-            "description": "Hash of the diagnostic result"
-          },
-          "result_blob": {
-            "type": "object",
-            "description": "Diagnostic result data"
-          }
-        }
-      }
+      "$ref": "schemas/diagnostics.schema.json"
     }
   }
 }

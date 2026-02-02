@@ -10,7 +10,7 @@ import yaml
 import re
 from collections import defaultdict, Counter
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 import argparse
 
 
@@ -74,12 +74,17 @@ def extract_canonical_fixes(text: str) -> List[str]:
     return matches
 
 
-def analyze_runbook_annotations(runbook_path: Path) -> Dict[str, any]:
+def analyze_runbook_annotations(runbook_path: Path) -> Dict[str, Any]:
     """Analyze annotations in a runbook to extract patterns."""
-    with open(runbook_path, 'r') as f:
-    runbook = yaml.safe_load(f) or {}
-    
+    with open(runbook_path, 'r', encoding='utf-8') as f:
+        runbook_data = yaml.safe_load(f)
+        if runbook_data is None or not isinstance(runbook_data, dict):
+            runbook_data = {}
+        runbook = runbook_data
+
     annotations = runbook.get('annotations', [])
+    if not isinstance(annotations, list):
+        annotations = []
     
     # Count occurrences of causes and fixes
     cause_counter = Counter()

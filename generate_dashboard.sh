@@ -17,3 +17,5 @@ echo ""
 echo "To view the dashboard:"
 echo "1. Open dashboard/index.html in a web browser"
 echo "2. The dashboard will automatically use the generated data.json"
+
+

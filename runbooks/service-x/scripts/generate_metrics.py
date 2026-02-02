@@ -17,8 +17,11 @@ import argparse
 def get_runbook_age(runbook_path):
     """Calculate the age of a runbook based on its last updated field."""
     with open(runbook_path, 'r', encoding='utf-8') as f:
-        runbook = yaml.safe_load(f) or {}
-    
+        runbook_data = yaml.safe_load(f)
+        if runbook_data is None:
+            runbook_data = {}
+        runbook = runbook_data
+
     last_updated_str = runbook.get('last_updated')
     if not last_updated_str:
         # Fallback to file modification time
@@ -46,7 +49,7 @@ def categorize_age(days):
 
 def analyze_runbook(runbook_path):
     """Analyze a single runbook for metrics."""
-    with open(runbook_path, 'r') as f:
+    with open(runbook_path, 'r', encoding='utf-8') as f:
         runbook = yaml.safe_load(f)
     
     annotations = runbook.get('annotations', [])

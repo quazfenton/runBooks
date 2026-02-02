@@ -7,29 +7,47 @@ Append incident annotations to the runbook YAML.
 
 import yaml
 import argparse
-from datetime import datetime
+import tempfile
+import os
+from datetime import datetime, timezone
 
 
 def annotate_runbook(runbook_path, incident_id, cause, fix, symptoms=None, runbook_gap=None):
-    with open(runbook_path, "r") as f:
-        runbook = yaml.safe_load(f)
-    
+    try:
+        with open(runbook_path, "r", encoding='utf-8') as f:
+            runbook = yaml.safe_load(f)
+    except (yaml.YAMLError, OSError) as e:
+        print(f"Error reading runbook file: {e}")
+        raise
+
     annotation = {
         "incident_id": incident_id,
-        "timestamp": datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "cause": cause,
         "fix": fix
     }
-    
+
     if symptoms:
         annotation["symptoms"] = symptoms if isinstance(symptoms, list) else [symptoms]
     if runbook_gap:
         annotation["runbook_gap"] = runbook_gap
-    
+
     runbook.setdefault("annotations", []).append(annotation)
-    
-    with open(runbook_path, "w") as f:
-        yaml.dump(runbook, f, default_flow_style=False)
+
+    # Perform atomic write using tempfile
+    try:
+        dir_path = os.path.dirname(runbook_path)
+        if not dir_path:
+            dir_path = '.'
+
+        with tempfile.NamedTemporaryFile(mode='w', dir=dir_path, delete=False, encoding='utf-8') as tmp_file:
+            yaml.dump(runbook, tmp_file, default_flow_style=False)
+            tmp_path = tmp_file.name
+
+        os.replace(tmp_path, runbook_path)
+    except (yaml.YAMLError, OSError) as e:
+        print(f"Error writing runbook file: {e}")
+        raise
 
 
 def main():

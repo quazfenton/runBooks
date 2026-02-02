@@ -48,8 +48,11 @@ def generate_result_hash(result_blob):
 def append_diagnostic_to_runbook(runbook_path, diagnostic_data):
     """Append diagnostic data to runbook YAML."""
     with open(runbook_path, "r") as f:
-        runbook = yaml.safe_load(f) or {}
-    
+        runbook_data = yaml.safe_load(f)
+        if runbook_data is None:
+            runbook_data = {}
+        runbook = runbook_data
+
     # Create diagnostic record following the schema
     diagnostic_record = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -59,9 +62,9 @@ def append_diagnostic_to_runbook(runbook_path, diagnostic_data):
         "result_blob": diagnostic_data,
         "provenance": "automated"
     }
-    
+
     runbook.setdefault("diagnostics", []).append(diagnostic_record)
-    
+
     with open(runbook_path, "w") as f:
         yaml.dump(runbook, f, default_flow_style=False)
 

@@ -15,10 +15,26 @@ from typing import List, Dict, Any
 
 def load_diagnostics_from_runbook(runbook_path: Path) -> List[Dict[str, Any]]:
     """Load all diagnostic records from a runbook."""
-    with open(runbook_path, 'r') as f:
-        runbook = yaml.safe_load(f)
-    
-    return (runbook or {}).get('diagnostics', [])
+    try:
+        with open(runbook_path, 'r', encoding='utf-8') as f:
+            runbook_data = yaml.safe_load(f)
+            if runbook_data is None or not isinstance(runbook_data, dict):
+                runbook_data = {}
+
+        diagnostics = runbook_data.get('diagnostics')
+        if not isinstance(diagnostics, list):
+            diagnostics = []
+
+        # Validate that diagnostics is a list of dicts
+        validated_diagnostics = []
+        for diag in diagnostics:
+            if isinstance(diag, dict):
+                validated_diagnostics.append(diag)
+
+        return validated_diagnostics
+    except (yaml.YAMLError, IOError) as e:
+        print(f"Error loading diagnostics from {runbook_path}: {e}")
+        return []
 
 
 def find_similar_diagnostics(

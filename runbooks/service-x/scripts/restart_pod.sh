@@ -18,12 +18,29 @@ if ! command -v kubectl &> /dev/null; then
     exit 1
 fi
 
+# Check if RUNBOOK_PATH is appropriate for appending Markdown
+if [ -d "$RUNBOOK_PATH" ] || [[ "$RUNBOOK_PATH" =~ \.(md|markdown)$ ]]; then
+    # OK to append to Markdown files or directories
+    :
+else
+    echo "Error: RUNBOOK_PATH ($RUNBOOK_PATH) is not a Markdown file or directory, refusing to modify."
+    exit 1
+fi
+
 echo "Restarting pod $POD in namespace $NAMESPACE"
 
 # Get pod info before restart for documentation
 echo "## Pod Info Before Restart" >> "$RUNBOOK_PATH"
 kubectl -n "$NAMESPACE" get pod "$POD" -o wide >> "$RUNBOOK_PATH" 2>&1 || echo "Could not get pod info" >> "$RUNBOOK_PATH"
 echo "" >> "$RUNBOOK_PATH"
+
+# Check if pod is controller-managed by inspecting ownerReferences
+OWNER_REF=$(kubectl -n "$NAMESPACE" get pod "$POD" -o jsonpath='{.metadata.ownerReferences}' 2>/dev/null || echo "")
+if [ -z "$OWNER_REF" ] || [ "$OWNER_REF" = "[]" ]; then
+    echo "Warning: Pod $POD has no owner references (may be a standalone pod). Skipping deletion for safety."
+    echo "Warning: Pod $POD has no owner references (may be a standalone pod). Skipping deletion for safety." >> "$RUNBOOK_PATH"
+    exit 1
+fi
 
 # Delete the pod to trigger restart
 kubectl -n "$NAMESPACE" delete pod "$POD" --wait=false 2>&1 || { echo "Error: Failed to delete pod $POD" >> "$RUNBOOK_PATH"; exit 1; }

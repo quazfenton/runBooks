@@ -22,16 +22,21 @@ SLACK_SIGNING_SECRET = os.environ.get('SLACK_SIGNING_SECRET')
 def verify_slack_signature(timestamp, signature, body):
     """Verify that the request came from Slack."""
     if not SLACK_SIGNING_SECRET:
-        # Skip verification if no secret is set (for development)
-        return True
-    
+        # Raise an error if no secret is set in production
+        raise ValueError("SLACK_SIGNING_SECRET environment variable is not set")
+
+    # Verify timestamp to prevent replay attacks (within 5 minutes)
+    import time
+    if abs(int(time.time()) - int(timestamp)) > 300:
+        return False
+
     sig_basestring = f"v0:{timestamp}:" + body
     expected_signature = 'v0=' + hmac.new(
         SLACK_SIGNING_SECRET.encode(),
         sig_basestring.encode(),
         hashlib.sha256
     ).hexdigest()
-    
+
     return hmac.compare_digest(expected_signature, signature)
 
 
@@ -84,4 +89,6 @@ def slack_interactions():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=3000)
+    import os
+    debug_mode = os.getenv('FLASK_DEBUG', '').lower() in ('true', '1', 'yes')
+    app.run(host='0.0.0.0', port=3000, debug=debug_mode)

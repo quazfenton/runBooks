@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# Check if flock is available
+if ! command -v flock &> /dev/null; then
+    echo "Error: flock command is not available"
+    exit 1
+fi
+
 if [ $# -ne 2 ]; then
     echo "Usage: $0 <service_name> <runbook_path>"
     exit 1
@@ -22,11 +28,12 @@ fi
 # Fetch active alerts for the service
 echo "Fetching Datadog alerts for service: $SERVICE"
 
-# URL-encode the service name
-SERVICE_ENCODED=$(printf %s "$SERVICE" | jq -sRr @uri)
-
+# Use curl's built-in URL encoding
 response=$(curl -s -X GET \
-  "https://api.datadoghq.com/api/v1/monitor?group_states=alert,warn,no%20data&tags=service:$SERVICE_ENCODED" \
+  -G \
+  --data-urlencode "tags=service:$SERVICE" \
+  --data-urlencode "group_states=alert,warn,no data" \
+  "https://api.datadoghq.com/api/v1/monitor" \
   -H "Content-Type: application/json" \
   -H "DD-API-KEY: $API_KEY" \
   -H "DD-APPLICATION-KEY: $APP_KEY")
@@ -41,14 +48,35 @@ fi
 # Extract alert IDs, names, and statuses
 alerts=$(echo "$response" | jq -r '.[] | "ID: \(.id) | Name: \(.name) | Status: \(.overall_state) | Priority: \(.priority)"')
 
-if [ -n "$alerts" ] && [ "$alerts" != "" ]; then
-    echo "## Active Datadog Alerts for $SERVICE" >> "$RUNBOOK_PATH"
-    echo "$alerts" >> "$RUNBOOK_PATH"
+# Check if the heading already exists to avoid duplicates
+HEADING_EXISTS=$(grep -c "^## Active Datadog Alerts for $SERVICE$" "$RUNBOOK_PATH" || true)
+
+# Use file locking to prevent concurrent writes
+exec 200>"$RUNBOOK_PATH.lock"
+flock -x 200 || exit 1
+
+# Create a temporary file for atomic write
+TEMP_FILE=$(mktemp)
+cp "$RUNBOOK_PATH" "$TEMP_FILE"
+
+if [ -n "$alerts" ]; then
+    if [ "$HEADING_EXISTS" -eq 0 ]; then
+        echo "## Active Datadog Alerts for $SERVICE" >> "$TEMP_FILE"
+    fi
+    echo "$alerts" >> "$TEMP_FILE"
     echo "$alerts"
 else
     echo "No active alerts found for service: $SERVICE"
-    echo "## Active Datadog Alerts for $SERVICE" >> "$RUNBOOK_PATH"
-    echo "No active alerts found." >> "$RUNBOOK_PATH"
+    if [ "$HEADING_EXISTS" -eq 0 ]; then
+        echo "## Active Datadog Alerts for $SERVICE" >> "$TEMP_FILE"
+    fi
+    echo "No active alerts found." >> "$TEMP_FILE"
 fi
+
+# Atomically replace the original file
+mv "$TEMP_FILE" "$RUNBOOK_PATH"
+
+# Release the lock
+exec 200>&-
 
 echo "Datadog alerts info appended to $RUNBOOK_PATH"

@@ -23,7 +23,8 @@
         "placeholder": {
           "type": "plain_text",
           "text": "e.g., INC-20260104-001"
-        }
+        },
+        "max_length": 100
       },
       "label": {
         "type": "plain_text",
@@ -50,6 +51,7 @@
     {
       "type": "input",
       "block_id": "root_cause",
+      "optional": true,
       "element": {
         "type": "plain_text_input",
         "action_id": "input",
@@ -67,6 +69,7 @@
     {
       "type": "input",
       "block_id": "fix_applied",
+      "optional": true,
       "element": {
         "type": "plain_text_input",
         "action_id": "input",
@@ -84,6 +87,7 @@
     {
       "type": "input",
       "block_id": "runbook_gaps",
+      "optional": true,
       "element": {
         "type": "plain_text_input",
         "action_id": "input",
@@ -107,7 +111,9 @@
         "placeholder": {
           "type": "plain_text",
           "text": "e.g., runbooks/service-x/runbook.yaml"
-        }
+        },
+        "min_length": 1,
+        "max_length": 3000
       },
       "label": {
         "type": "plain_text",

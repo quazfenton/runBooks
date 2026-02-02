@@ -42,26 +42,31 @@ def test_suggestion_engine():
         }
         yaml.dump(test_runbook, f)
         temp_path = Path(f.name)
-    
-    # Test the suggestion engine
-    suggestions = suggest_runbook_updates(temp_path, min_frequency=1)
-    
-    print("Suggestions found:")
-    for suggestion in suggestions:
-        print(f"  - {suggestion['type']}: {suggestion['item']} ({suggestion['count']} times) - {suggestion['reason']}")
-    
-    # Verify we got expected suggestions
-    assert len(suggestions) > 0, "Should have found suggestions"
-    
-    # Check for expected suggestions
-    suggestion_items = [s['item'] for s in suggestions]
-    assert 'increase_resource_limits' in suggestion_items, "Should suggest increasing resource limits"
-    assert 'memory_leak' in [s['item'] if s['type'] == 'add_monitoring' else s['item'].split(' -> ')[0] for s in suggestions], "Should identify memory leak as issue"
-    
-    print("\nSuggestion engine test passed!")
-    
-    # Clean up
-    temp_path.unlink()
+
+    try:
+        # Test the suggestion engine
+        suggestions = suggest_runbook_updates(temp_path, min_frequency=1)
+
+        print("Suggestions found:")
+        for suggestion in suggestions:
+            print(f"  - {suggestion['type']}: {suggestion['item']} ({suggestion['count']} times) - {suggestion['reason']}")
+
+        # Verify we got expected suggestions
+        assert len(suggestions) > 0, "Should have found suggestions"
+
+        # Check for expected suggestions
+        suggestion_items = [s['item'] for s in suggestions]
+        assert 'increase_resource_limits' in suggestion_items, "Should suggest increasing resource limits"
+        assert 'memory_leak' in [s['item'] if s['type'] == 'add_monitoring' else s['item'].split(' -> ')[0] for s in suggestions], "Should identify memory leak as issue"
+
+        print("\nSuggestion engine test passed!")
+    finally:
+        # Clean up
+        try:
+            temp_path.unlink()
+        except FileNotFoundError:
+            # File may have been moved/deleted during test
+            pass
 
 
 def test_pattern_extraction():

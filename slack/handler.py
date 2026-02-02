@@ -8,12 +8,12 @@ and appending them to runbooks.
 
 import json
 import yaml
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 
-def create_annotation_from_slack_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_annotation_from_slack_payload(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
     """Create an annotation from a Slack modal submission payload."""
     state_values = payload['view']['state']['values']
     
@@ -47,17 +47,26 @@ def create_annotation_from_slack_payload(payload: Dict[str, Any]) -> Dict[str, A
 
 def append_annotation_to_runbook(runbook_path: str, annotation: Dict[str, Any]) -> None:
     """Append an annotation to the runbook YAML file."""
+    # Validate that the path is within the expected runbooks directory to prevent path traversal
     runbook_file = Path(runbook_path)
-    
-    with open(runbook_file, 'r') as f:
+    resolved_path = runbook_file.resolve()
+    expected_base = Path("runbooks").resolve()
+
+    # Check if the resolved path starts with the expected base path
+    try:
+        resolved_path.relative_to(expected_base)
+    except ValueError:
+        raise ValueError(f"Invalid runbook path: {runbook_path}. Path must be within the runbooks directory.")
+
+    with open(resolved_path, 'r') as f:
         runbook = yaml.safe_load(f)
-    
+
     if 'annotations' not in runbook:
         runbook['annotations'] = []
-    
+
     runbook['annotations'].append(annotation)
-    
-    with open(runbook_file, 'w') as f:
+
+    with open(resolved_path, 'w') as f:
         yaml.dump(runbook, f, default_flow_style=False)
 
 

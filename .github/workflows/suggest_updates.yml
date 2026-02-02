@@ -30,7 +30,7 @@ jobs:
       - name: Create or update PR if needed
         run: |
           # Check if there are any suggestions
-          if [ -s suggestions.json ] && [ "$(jq 'length' < suggestions.json)" -gt 0 ]; then
+          if [ -s suggestions.json ] && [ "$(jq -r 'length' suggestions.json)" -gt 0 ]; then
             echo "Found suggestions, creating PR..."
             
             # Create a new branch
@@ -85,7 +85,7 @@ jobs:
               --title "Auto-update runbook suggestions" \
               --body-file pr-description.md \
               --head "$BRANCH_NAME" \
-              --base main
+              --base master
           else
             echo "No suggestions found, skipping PR creation"
           fi
