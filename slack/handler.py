@@ -4,15 +4,27 @@ Slack App Handler for Incident Annotations
 
 This module handles Slack interactions for capturing incident annotations
 and appending them to runbooks.
+
+Security Features:
+- Atomic path validation with symlink protection
+- Input validation via Pydantic models
+- Secure temp file handling
 """
 
 import json
 import yaml
 import re
+import os
+import errno
+import stat
+import tempfile
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, Union
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class AnnotationInput(BaseModel):
@@ -47,34 +59,116 @@ class AnnotationInput(BaseModel):
         return v
 
 
-def validate_runbook_path_secure(user_path: str, base_dir: Path) -> Path:
+class PathSecurityError(Exception):
+    """Raised when path validation fails."""
+    pass
+
+
+def validate_runbook_path_secure(user_path: str, base_dir: Path) -> Tuple[Path, str]:
     """
-    Securely validate runbook path to prevent path traversal and symlink attacks.
+    Securely validate and read runbook with atomic operations.
     
-    This implementation:
-    1. Resolves to canonical paths
-    2. Checks for symlink attacks
-    3. Validates path prefix
-    4. Ensures file exists within allowed directory
+    This implementation prevents:
+    1. TOCTOU (Time-of-Check to Time-of-Use) race conditions
+    2. Symlink attacks via O_NOFOLLOW
+    3. Path traversal via normpath validation
     
     Args:
         user_path: User-provided path (relative to base_dir)
         base_dir: Base directory that paths must be within
-    
+        
     Returns:
-        Resolved Path object if valid
-    
+        Tuple of (resolved_path, file_content)
+        
     Raises:
-        ValueError: If path is invalid or attempts traversal
+        PathSecurityError: If path is invalid or attempts traversal
+        FileNotFoundError: If runbook file doesn't exist
     """
     base_dir = base_dir.resolve()
     
+    # Reject absolute paths immediately
+    if Path(user_path).is_absolute():
+        raise PathSecurityError("Absolute paths not allowed")
+    
+    # Reject path traversal sequences
+    if '..' in user_path:
+        raise PathSecurityError("Path traversal sequences (..) not allowed")
+    
+    # Normalize path without resolving symlinks
+    user_path_obj = base_dir / user_path
+    normalized = os.path.normpath(str(user_path_obj))
+    
+    # Verify normalized path is within base
+    if not normalized.startswith(str(base_dir)):
+        raise PathSecurityError(
+            f"Path escapes allowed directory: {normalized}"
+        )
+    
+    # Check for symlinks before opening
+    path_obj = Path(normalized)
+    if path_obj.is_symlink():
+        raise PathSecurityError(f"Symlinks not allowed: {path_obj}")
+    
+    # Check parent directories for symlinks
+    for parent in path_obj.parents:
+        if parent.is_symlink():
+            raise PathSecurityError(f"Symlink in path: {parent}")
+    
+    # Open file with O_NOFOLLOW to prevent symlink race conditions
+    # Note: O_NOFOLLOW is not available on Windows, so we do a pre-check
+    try:
+        # On Windows, we already checked for symlinks above
+        # On Unix, use O_NOFOLLOW for additional protection
+        if hasattr(os, 'O_NOFOLLOW'):
+            fd = os.open(normalized, os.O_RDONLY | os.O_NOFOLLOW)
+        else:
+            # Windows fallback - already checked for symlinks above
+            fd = os.open(normalized, os.O_RDONLY)
+        
+        with os.fdopen(fd, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return path_obj, content
+    except OSError as e:
+        if e.errno == errno.ELOOP:
+            raise PathSecurityError(f"Symlink detected: {normalized}")
+        if e.errno == errno.ENOENT:
+            raise FileNotFoundError(f"Runbook file not found: {normalized}")
+        raise PathSecurityError(f"Error accessing file: {e}")
+
+
+def validate_runbook_path_secure_legacy(user_path: str, base_dir: Path) -> Path:
+    """
+    Legacy path validation (deprecated - use validate_runbook_path_secure instead).
+    
+    DEPRECATED: This function has a TOCTOU race condition.
+    Only use for backward compatibility during migration.
+    
+    Args:
+        user_path: User-provided path (relative to base_dir)
+        base_dir: Base directory that paths must be within
+        
+    Returns:
+        Resolved Path object if valid
+        
+    Raises:
+        ValueError: If path is invalid or attempts traversal
+    """
+    import warnings
+    warnings.warn(
+        "validate_runbook_path_secure_legacy is deprecated. "
+        "Use validate_runbook_path_secure() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
+    base_dir = base_dir.resolve()
+
     # Construct full path and resolve
     if Path(user_path).is_absolute():
         user_path_obj = Path(user_path).resolve()
     else:
         user_path_obj = (base_dir / user_path).resolve()
-    
+
     # Check canonical path starts with base
     try:
         user_path_obj.relative_to(base_dir)
@@ -83,19 +177,19 @@ def validate_runbook_path_secure(user_path: str, base_dir: Path) -> Path:
             f"Path traversal detected: {user_path} resolves to {user_path_obj}, "
             f"which is outside allowed directory {base_dir}"
         )
-    
+
     # Check for symlinks in path components (security hardening)
     for parent in user_path_obj.parents:
         if parent.is_symlink():
             raise ValueError(f"Symlinks not allowed in path: {parent}")
-    
+
     if user_path_obj.is_symlink():
         raise ValueError(f"Runbook path cannot be a symlink: {user_path_obj}")
-    
+
     # Verify file exists
     if not user_path_obj.exists():
         raise FileNotFoundError(f"Runbook file not found: {user_path_obj}")
-    
+
     return user_path_obj
 
 
@@ -131,32 +225,65 @@ def create_annotation_from_slack_payload(payload: Dict[str, Any]) -> Tuple[Dict[
     return annotation, runbook_path
 
 
+def sanitize_for_yaml(value: Any) -> Any:
+    """
+    Sanitize values before YAML serialization to prevent tag injection attacks.
+    
+    YAML deserialization can execute arbitrary code via tags like !!python/object.
+    This function escapes potential injection vectors.
+    
+    Args:
+        value: Value to sanitize
+        
+    Returns:
+        Sanitized value safe for YAML serialization
+    """
+    if isinstance(value, str):
+        # Remove potential YAML tag injection
+        if value.startswith('!!') or value.startswith('!'):
+            value = f"'{value}'"
+        # Escape control characters that could cause issues
+        value = value.replace('\x00', '').replace('\x08', '')
+    elif isinstance(value, dict):
+        return {k: sanitize_for_yaml(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [sanitize_for_yaml(v) for v in value]
+    return value
+
+
 def append_annotation_to_runbook(runbook_path: str, annotation: Dict[str, Any]) -> None:
     """
     Append an annotation to the runbook YAML file with secure path validation.
     
+    Security features:
+    - Atomic path validation with O_NOFOLLOW
+    - Secure temp file with 0600 permissions
+    - YAML output sanitization
+    
     Args:
         runbook_path: Path to runbook YAML file (relative to project root)
         annotation: Annotation data to append
-    
+
     Raises:
-        ValueError: If path is invalid or security check fails
+        PathSecurityError: If path is invalid or security check fails
         FileNotFoundError: If runbook file doesn't exist
     """
-    # Use secure path validation
+    # Use secure path validation (returns tuple of path and content)
     base_dir = Path(__file__).parent.parent  # Project root
-    resolved_path = validate_runbook_path_secure(runbook_path, base_dir / "runbooks")
-    
-    # Read existing runbook
-    with open(resolved_path, 'r', encoding='utf-8') as f:
-        runbook = yaml.safe_load(f)
-        if runbook is None:
-            runbook = {}
+    resolved_path, content = validate_runbook_path_secure(
+        runbook_path, 
+        base_dir / "runbooks"
+    )
+
+    # Parse existing runbook from secure content
+    runbook = yaml.safe_load(content)
+    if runbook is None:
+        runbook = {}
 
     # Ensure annotations list exists
     if 'annotations' not in runbook:
         runbook['annotations'] = []
-    
+
     # Validate annotations is a list
     if not isinstance(runbook['annotations'], list):
         runbook['annotations'] = []
@@ -164,23 +291,35 @@ def append_annotation_to_runbook(runbook_path: str, annotation: Dict[str, Any]) 
     # Append annotation
     runbook['annotations'].append(annotation)
 
-    # Atomic write using temporary file
-    import tempfile
-    import os
-    
+    # Sanitize runbook before YAML serialization
+    runbook = sanitize_for_yaml(runbook)
+
+    # Atomic write using temporary file with secure permissions
     temp_fd, temp_path = tempfile.mkstemp(
         suffix='.yaml',
         prefix='runbook_',
         dir=resolved_path.parent
     )
-    
+
     try:
-        with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
-            yaml.dump(runbook, f, default_flow_style=False, allow_unicode=True)
+        # Set restrictive permissions (owner read/write only - 0600)
+        os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR)
         
+        with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+            yaml.dump(
+                runbook, 
+                f, 
+                default_flow_style=False, 
+                allow_unicode=True,
+                sort_keys=False  # Preserve field order
+            )
+
         # Atomic replace
         os.replace(temp_path, resolved_path)
-    except Exception:
+        logger.info(f"Successfully appended annotation to {resolved_path}")
+        
+    except Exception as e:
+        logger.error(f"Error writing annotation to {resolved_path}: {e}", exc_info=True)
         # Clean up temp file on error
         if os.path.exists(temp_path):
             os.unlink(temp_path)

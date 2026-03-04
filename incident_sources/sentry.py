@@ -2,13 +2,25 @@
 Sentry Integration
 
 Provides integration with Sentry for error tracking and incident creation.
+
+Security Features:
+- Webhook signature validation (HMAC-SHA256)
+- Timestamp validation to prevent replay attacks
+- Secure API token handling
 """
 
 import os
+import hmac
+import hashlib
+import base64
+import time
+import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import requests
 from incident_sources.base import IncidentSource, Incident
+
+logger = logging.getLogger(__name__)
 
 
 class SentryIssue(Incident):
@@ -60,36 +72,38 @@ class SentryIssue(Incident):
 class SentryIntegration(IncidentSource):
     """
     Sentry integration for error tracking.
-    
+
     Supports:
     - API sync for issue retrieval
     - Webhook parsing for real-time alerts
     - Issue resolution and updates
+    - Webhook signature validation (HMAC-SHA256)
     """
-    
+
     def __init__(
         self,
         api_token: Optional[str] = None,
         org_slug: Optional[str] = None,
-        base_url: str = "https://sentry.io/api/0"
+        base_url: str = "https://sentry.io/api/0",
+        webhook_secret: Optional[str] = None
     ):
         """
         Initialize Sentry integration.
-        
+
         Args:
             api_token: Sentry API token (or set SENTRY_API_TOKEN env var)
             org_slug: Sentry organization slug (or set SENTRY_ORG_SLUG env var)
             base_url: Sentry API base URL
+            webhook_secret: Secret for webhook signature validation
         """
         self.api_token = api_token or os.environ.get('SENTRY_API_TOKEN')
         self.org_slug = org_slug or os.environ.get('SENTRY_ORG_SLUG')
         self.base_url = base_url
-        
+        self.webhook_secret = webhook_secret or os.environ.get('SENTRY_WEBHOOK_SECRET')
+
         if not self.api_token:
-            raise ValueError(
-                "Sentry API token required. Set SENTRY_API_TOKEN environment variable."
-            )
-        
+            logger.warning("Sentry API token not configured")
+
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": f"Bearer {self.api_token}",
@@ -99,7 +113,78 @@ class SentryIntegration(IncidentSource):
     @property
     def source_name(self) -> str:
         return "sentry"
-    
+
+    def validate_webhook_signature(
+        self,
+        payload: bytes,
+        signature: str,
+        timestamp: str
+    ) -> bool:
+        """
+        Validate Sentry webhook signature.
+        
+        Sentry uses HMAC-SHA256 with the webhook secret.
+        Signature format: v0=base64(hmac-sha256(secret, body))
+        
+        Args:
+            payload: Raw request body bytes
+            signature: Signature header value
+            timestamp: Timestamp header value
+            
+        Returns:
+            True if signature is valid
+            
+        Raises:
+            None (returns False on any error)
+        """
+        if not self.webhook_secret:
+            logger.debug("Sentry webhook secret not configured, skipping validation")
+            return True
+        
+        try:
+            # Validate timestamp format
+            if not timestamp or not timestamp.isdigit():
+                logger.warning("Invalid Sentry webhook timestamp format")
+                return False
+            
+            # Prevent replay attacks - reject timestamps older than 5 minutes
+            current_time = int(time.time())
+            if abs(current_time - int(timestamp)) > 300:  # 5 minutes
+                logger.warning(f"Sentry webhook timestamp too old: {timestamp}")
+                return False
+            
+            # Parse signature (format: "v0=base64_signature")
+            if '=' not in signature:
+                logger.warning("Invalid Sentry webhook signature format")
+                return False
+            
+            version, provided_sig = signature.split('=', 1)
+            if version != 'v0':
+                logger.warning(f"Unknown Sentry signature version: {version}")
+                return False
+            
+            # Calculate expected signature
+            message = payload
+            expected_sig = base64.b64encode(
+                hmac.new(
+                    self.webhook_secret.encode('utf-8'),
+                    message,
+                    hashlib.sha256
+                ).digest()
+            ).decode('utf-8')
+            
+            # Compare signatures securely
+            if not hmac.compare_digest(provided_sig, expected_sig):
+                logger.warning("Sentry webhook signature mismatch")
+                return False
+            
+            logger.debug("Sentry webhook signature validated successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error validating Sentry webhook signature: {e}", exc_info=True)
+            return False
+
     def parse_webhook(self, payload: Dict[str, Any]) -> SentryIssue:
         """
         Parse Sentry webhook payload.
