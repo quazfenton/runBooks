@@ -1,0 +1,65 @@
+# Living Runbooks - code-server Development Environment
+# This Dockerfile extends the base image with code-server for web-based VS Code
+
+FROM codercom/code-server:latest
+
+USER root
+
+# Install Python and dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create workspace directory
+WORKDIR /workspace
+
+# Copy project files
+COPY . /workspace/
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Install recommended VS Code extensions
+RUN code-server --install-extension ms-python.python \
+    && code-server --install-extension ms-python.vscode-pylance \
+    && code-server --install-extension redhat.vscode-yaml \
+    && code-server --install-extension ms-azuretools.vscode-docker \
+    && code-server --install-extension fastapi.fastapi-snippets \
+    && code-server --install-extension littlefoxteam.vscode-python-test-adapter
+
+# Set up workspace settings
+RUN mkdir -p /workspace/.vscode && cat > /workspace/.vscode/settings.json << 'EOF'
+{
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/.pytest_cache": true
+    },
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests/",
+        "-v"
+    ]
+}
+EOF
+
+# Create extensions directory for additional VSIX
+RUN mkdir -p /workspace/extensions
+
+# Expose code-server port
+EXPOSE 8080
+
+# Set entrypoint
+ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+CMD ["--auth", "none", "--bind-addr", "0.0.0.0:8080", "/workspace"]

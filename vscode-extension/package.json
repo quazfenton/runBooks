@@ -1,0 +1,157 @@
+{
+  "name": "living-runbooks",
+  "displayName": "Living Runbooks",
+  "description": "Incident response runbook management with AI-powered suggestions",
+  "version": "2.1.0",
+  "publisher": "living-runbooks",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:yaml",
+    "onView:runbooks"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "living-runbooks",
+          "title": "Living Runbooks",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "living-runbooks": [
+        {
+          "id": "runbooksView",
+          "name": "Runbooks",
+          "icon": "resources/icon.svg"
+        },
+        {
+          "id": "incidentsView",
+          "name": "Incidents"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "living-runbooks.refresh",
+        "title": "Refresh Runbooks",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "living-runbooks.openRunbook",
+        "title": "Open Runbook",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "living-runbooks.annotateIncident",
+        "title": "Annotate Incident",
+        "icon": "$(comment-add)"
+      },
+      {
+        "command": "living-runbooks.generateSuggestions",
+        "title": "Generate AI Suggestions",
+        "icon": "$(lightbulb)"
+      },
+      {
+        "command": "living-runbooks.findSimilarIncidents",
+        "title": "Find Similar Incidents",
+        "icon": "$(search)"
+      },
+      {
+        "command": "living-runbooks.generateReport",
+        "title": "Generate Post-Incident Report",
+        "icon": "$(report)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "living-runbooks.refresh",
+          "when": "view == runbooksView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "living-runbooks.openRunbook",
+          "when": "view == runbooksView",
+          "group": "inline"
+        },
+        {
+          "command": "living-runbooks.annotateIncident",
+          "when": "view == runbooksView"
+        },
+        {
+          "command": "living-runbooks.generateSuggestions",
+          "when": "view == runbooksView"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Living Runbooks",
+      "properties": {
+        "livingRunbooks.api_url": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Living Runbooks API URL"
+        },
+        "livingRunbooks.api_key": {
+          "type": "string",
+          "default": "",
+          "description": "API key for authentication"
+        },
+        "livingRunbooks.runbooks_path": {
+          "type": "string",
+          "default": "./runbooks",
+          "description": "Path to runbooks directory"
+        }
+      }
+    },
+    "yamlValidation": [
+      {
+        "fileMatch": "runbook.yaml",
+        "url": "./schemas/runbook.schema.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "ts-loader": "^9.5.1",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "js-yaml": "^4.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/living-runbooks/runbooks.git"
+  },
+  "homepage": "https://github.com/living-runbooks/runbooks#readme",
+  "bugs": {
+    "url": "https://github.com/living-runbooks/runbooks/issues"
+  }
+}

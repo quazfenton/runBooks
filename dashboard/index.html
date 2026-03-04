@@ -111,153 +111,231 @@
     </div>
 
     <script>
-        // Sample data - in a real implementation, this would come from an API
-        const sampleData = {
-            totalRunbooks: 12,
-            staleRunbooks: 3,
-            totalAnnotations: 47,
-            avgResolutionTime: 24.5, // in minutes
-            incidentsByService: {
-                'service-x': 15,
-                'service-y': 8,
-                'service-z': 5,
-                'api-gateway': 12,
-                'auth-service': 7
-            },
-            usageByService: {
-                'service-x': 23,
-                'service-y': 18,
-                'service-z': 12,
-                'api-gateway': 31,
-                'auth-service': 15
-            },
-            topFixes: [
-                {name: 'increase_resource_limits', count: 12},
-                {name: 'restart_component', count: 8},
-                {name: 'rollback_deployment', count: 5},
-                {name: 'scale_up_resources', count: 4},
-                {name: 'fix_configuration', count: 3}
-            ],
-            runbookAges: [
-                {label: '0-30 days', count: 5},
-                {label: '31-60 days', count: 3},
-                {label: '61-90 days', count: 2},
-                {label: '90+ days', count: 2}
-            ]
-        };
+        // Dashboard data - will be fetched from API
+        let dashboardData = null;
 
-        // Update metrics
-        document.getElementById('totalRunbooks').textContent = sampleData.totalRunbooks;
-        document.getElementById('staleRunbooks').textContent = sampleData.staleRunbooks;
-        document.getElementById('totalAnnotations').textContent = sampleData.totalAnnotations;
-        document.getElementById('avgResolutionTime').textContent = Math.round(sampleData.avgResolutionTime) + 'm';
+        // Fetch metrics from API
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('/api/metrics');
+                const result = await response.json();
+                
+                if (result.status === 'ok') {
+                    dashboardData = result.metrics;
+                    updateDashboard();
+                } else {
+                    console.error('Error fetching metrics:', result.error);
+                    // Fallback to sample data
+                    dashboardData = getSampleData();
+                    updateDashboard();
+                }
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+                // Fallback to sample data
+                dashboardData = getSampleData();
+                updateDashboard();
+            }
+        }
 
-        // Incidents by service chart
-        const incidentsCtx = document.getElementById('incidentsChart').getContext('2d');
-        new Chart(incidentsCtx, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(sampleData.incidentsByService),
-                datasets: [{
-                    label: 'Incidents',
-                    data: Object.values(sampleData.incidentsByService),
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
+        // Sample data fallback (for development without API)
+        function getSampleData() {
+            return {
+                totalRunbooks: 1,
+                staleRunbooks: 0,
+                totalAnnotations: 0,
+                avgResolutionTime: 24.5,
+                incidentsByService: {
+                    'service-x': 0
+                },
+                usageByService: {
+                    'service-x': 1
+                },
+                topFixes: [],
+                runbookAges: [
+                    {label: '31-60 days', count: 1}
+                ]
+            };
+        }
+
+        // Update dashboard with current data
+        function updateDashboard() {
+            if (!dashboardData) return;
+
+            // Update metric cards
+            document.getElementById('totalRunbooks').textContent = dashboardData.totalRunbooks || 0;
+            document.getElementById('staleRunbooks').textContent = dashboardData.staleRunbooks || 0;
+            document.getElementById('totalAnnotations').textContent = dashboardData.totalAnnotations || 0;
+            document.getElementById('avgResolutionTime').textContent = 
+                Math.round(dashboardData.avgResolutionTime || 0) + 'm';
+
+            // Update charts
+            updateCharts();
+        }
+
+        // Chart instances
+        let incidentsChart = null;
+        let usageChart = null;
+        let fixesChart = null;
+        let ageChart = null;
+
+        // Update charts with new data
+        function updateCharts() {
+            // Incidents by service chart
+            const incidentsCtx = document.getElementById('incidentsChart').getContext('2d');
+            if (incidentsChart) {
+                incidentsChart.destroy();
+            }
+            incidentsChart = new Chart(incidentsCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(dashboardData.incidentsByService || {}),
+                    datasets: [{
+                        label: 'Incidents',
+                        data: Object.values(dashboardData.incidentsByService || {}),
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        });
+            });
 
-        // Usage by service chart
-        const usageCtx = document.getElementById('usageChart').getContext('2d');
-        new Chart(usageCtx, {
-            type: 'line',
-            data: {
-                labels: Object.keys(sampleData.usageByService),
-                datasets: [{
-                    label: 'Runbook Usage',
-                    data: Object.values(sampleData.usageByService),
-                    fill: false,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
+            // Usage by service chart
+            const usageCtx = document.getElementById('usageChart').getContext('2d');
+            if (usageChart) {
+                usageChart.destroy();
+            }
+            usageChart = new Chart(usageCtx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(dashboardData.usageByService || {}),
+                    datasets: [{
+                        label: 'Runbook Usage',
+                        data: Object.values(dashboardData.usageByService || {}),
+                        fill: false,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        });
+            });
 
-        // Top fixes chart
-        const fixesCtx = document.getElementById('fixesChart').getContext('2d');
-        new Chart(fixesCtx, {
-            type: 'bar',
-            data: {
-                labels: sampleData.topFixes.map(item => item.name),
-                datasets: [{
-                    label: 'Fix Count',
-                    data: sampleData.topFixes.map(item => item.count),
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                scales: {
-                    x: {
-                        beginAtZero: true
+            // Top fixes chart
+            const fixesCtx = document.getElementById('fixesChart').getContext('2d');
+            if (fixesChart) {
+                fixesChart.destroy();
+            }
+            fixesChart = new Chart(fixesCtx, {
+                type: 'bar',
+                data: {
+                    labels: (dashboardData.topFixes || []).map(item => item.name),
+                    datasets: [{
+                        label: 'Fix Count',
+                        data: (dashboardData.topFixes || []).map(item => item.count),
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
                     }
                 }
+            });
+
+            // Runbook age distribution
+            const ageCtx = document.getElementById('ageChart').getContext('2d');
+            if (ageChart) {
+                ageChart.destroy();
             }
+            ageChart = new Chart(ageCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: (dashboardData.runbookAges || []).map(item => item.label),
+                    datasets: [{
+                        data: (dashboardData.runbookAges || []).map(item => item.count),
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(153, 102, 255, 0.2)',
+                            'rgba(255, 159, 64, 0.2)',
+                            'rgba(255, 99, 132, 0.2)'
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+        }
+
+        // WebSocket for real-time updates
+        let ws = null;
+        
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/dashboard`);
+            
+            ws.onopen = function() {
+                console.log('Connected to WebSocket');
+            };
+            
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                if (message.type === 'metrics_update') {
+                    dashboardData = message.data.metrics;
+                    updateDashboard();
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket disconnected, reconnecting in 5 seconds...');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchMetrics();
+            connectWebSocket();
         });
 
-        // Runbook age distribution
-        const ageCtx = document.getElementById('ageChart').getContext('2d');
-        new Chart(ageCtx, {
-            type: 'doughnut',
-            data: {
-                labels: sampleData.runbookAges.map(item => item.label),
-                datasets: [{
-                    data: sampleData.runbookAges.map(item => item.count),
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.2)',
-                        'rgba(153, 102, 255, 0.2)',
-                        'rgba(255, 159, 64, 0.2)',
-                        'rgba(255, 99, 132, 0.2)'
-                    ],
-                    borderColor: [
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(255, 99, 132, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true
+        // Fallback: Poll API every 30 seconds if WebSocket fails
+        setInterval(function() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                return;  // WebSocket is working
             }
-        });
-
-        // Auto-refresh every 5 minutes
-        setInterval(() => {
-            // In a real implementation, this would fetch new data from an API
-            console.log('Refreshing dashboard data...');
-        }, 300000);
+            fetchMetrics();
+        }, 30000);
     </script>
 </body>
 </html>

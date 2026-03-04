@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # Main API server
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - FLASK_ENV=production
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - PAGERDUTY_API_KEY=${PAGERDUTY_API_KEY:-}
+      - PAGERDUTY_WEBHOOK_SECRET=${PAGERDUTY_WEBHOOK_SECRET:-}
+      - DATADOG_API_KEY=${DATADOG_API_KEY:-}
+      - DATADOG_APP_KEY=${DATADOG_APP_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ./runbooks:/app/runbooks
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - runbooks-network
+
+  # Slack webhook server (Flask)
+  slack-webhook:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - FLASK_ENV=production
+    volumes:
+      - ./runbooks:/app/runbooks
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - runbooks-network
+    command: ["python", "slack/app.py"]
+
+  # Redis for caching and WebSocket
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - runbooks-network
+
+  # code-server for web-based development (optional)
+  code-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.code-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/workspace
+      - code-server-extensions:/home/coder/.local/share/code-server/extensions
+    environment:
+      - PASSWORD=${CODE_SERVER_PASSWORD:-admin}
+    restart: unless-stopped
+    networks:
+      - runbooks-network
+    profiles:
+      - dev
+
+  # PostgreSQL (optional - for future database support)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=runbooks
+      - POSTGRES_USER=runbooks
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-runbooks123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - runbooks-network
+    profiles:
+      - with-db
+
+  # Prometheus AlertManager (optional)
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    restart: unless-stopped
+    networks:
+      - runbooks-network
+    profiles:
+      - monitoring
+
+  # Grafana for dashboards (optional)
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - runbooks-network
+    profiles:
+      - monitoring
+
+volumes:
+  redis-data:
+  postgres-data:
+  grafana-data:
+  code-server-extensions:
+
+networks:
+  runbooks-network:
+    driver: bridge
