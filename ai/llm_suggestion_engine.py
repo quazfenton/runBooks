@@ -130,26 +130,42 @@ class LLMRunbookEvolution:
     ) -> List[Suggestion]:
         """
         Analyze an incident and suggest runbook improvements.
-        
+
         Args:
             incident_annotation: The incident annotation to analyze
             current_runbook: Current runbook structure
             similar_incidents: Optional list of similar past incidents
-        
+
         Returns:
             List of suggestions for runbook improvement
+            
+        Raises:
+            ValueError: If input data is invalid
+            RuntimeError: If LLM provider fails
         """
+        # Validate inputs
+        if not incident_annotation:
+            raise ValueError("incident_annotation cannot be empty")
+        if not current_runbook:
+            raise ValueError("current_runbook cannot be empty")
+        
+        # Check if LLM is available
         if not self.llm:
+            logger.warning("LLM provider not available, using fallback analysis")
             return self._fallback_analyze(incident_annotation, current_runbook)
-        
-        prompt = self._build_analysis_prompt(
-            incident_annotation,
-            current_runbook,
-            similar_incidents
-        )
-        response = self.llm.generate(prompt, max_tokens=2000)
-        
-        return self._parse_suggestions(response)
+
+        try:
+            prompt = self._build_analysis_prompt(
+                incident_annotation,
+                current_runbook,
+                similar_incidents
+            )
+            response = self.llm.generate(prompt, max_tokens=2000)
+            return self._parse_suggestions(response)
+        except Exception as e:
+            logger.error(f"LLM analysis failed: {e}", exc_info=True)
+            # Fallback to basic analysis
+            return self._fallback_analyze(incident_annotation, current_runbook)
     
     def _build_analysis_prompt(
         self,

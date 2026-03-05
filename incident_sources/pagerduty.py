@@ -161,10 +161,15 @@ class PagerDutyIntegration(IncidentSource):
         timestamp: str
     ) -> bool:
         """
-        Validate PagerDuty webhook signature.
+        Validate PagerDuty webhook signature with replay attack prevention.
 
         PagerDuty signs webhooks with HMAC-SHA256. The signature format is:
         v0=base64(hmac-sha256(secret, timestamp + body))
+
+        SECURITY ENHANCED:
+        - Timestamp validation to prevent replay attacks (5-minute window)
+        - Constant-time signature comparison
+        - Signature version validation
 
         Args:
             payload: Raw request body bytes
@@ -173,11 +178,13 @@ class PagerDutyIntegration(IncidentSource):
 
         Returns:
             bool: True if signature is valid, False if invalid or not configured
-        
+
         Note:
             Returns False (not True) when no secret is configured to prevent
             accidental acceptance of unvalidated webhooks in production.
         """
+        import time
+        
         if not self.webhook_secret:
             # Log warning and return False to prevent unvalidated webhooks
             logger.warning(
@@ -188,6 +195,26 @@ class PagerDutyIntegration(IncidentSource):
             return False
 
         try:
+            # SECURITY: Validate timestamp format
+            if not timestamp or not timestamp.isdigit():
+                logger.warning("Invalid timestamp format: not numeric")
+                return False
+
+            # SECURITY: Prevent replay attacks - reject timestamps older than 5 minutes
+            current_time = int(time.time())
+            try:
+                webhook_time = int(timestamp)
+                time_diff = abs(current_time - webhook_time)
+                if time_diff > 300:  # 5 minutes
+                    logger.warning(
+                        f"Webhook timestamp too old: {time_diff}s difference. "
+                        "Possible replay attack."
+                    )
+                    return False
+            except ValueError:
+                logger.warning("Invalid timestamp: cannot parse as integer")
+                return False
+
             # Parse signature (format: "v0=base64_signature")
             if '=' not in signature:
                 logger.warning("Invalid signature format: missing '=' separator")
@@ -209,12 +236,12 @@ class PagerDutyIntegration(IncidentSource):
                 hashlib.sha256
             ).hexdigest()
 
-            # Compare signatures securely
+            # Compare signatures securely (constant-time)
             is_valid = hmac.compare_digest(provided_sig, expected_sig)
-            
+
             if not is_valid:
                 logger.warning("PagerDuty webhook signature validation failed")
-            
+
             return is_valid
 
         except Exception as e:

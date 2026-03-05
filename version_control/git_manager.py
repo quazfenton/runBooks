@@ -3,6 +3,8 @@ Git Version Control for Runbooks
 
 Provides git-backed versioning for runbook changes with audit trails.
 Requires gitpython: pip install gitpython
+
+SECURITY ENHANCED: Added retry logic for transient failures
 """
 
 import os
@@ -10,6 +12,8 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 import yaml
+import time
+from functools import wraps
 
 try:
     from git import Repo, Actor, GitCommandError
@@ -17,6 +21,49 @@ try:
 except ImportError:
     GITPYTHON_AVAILABLE = False
     print("Warning: gitpython not installed. Install with: pip install gitpython")
+
+
+def retry_on_git_error(max_attempts=3, delay=1.0, backoff=2.0):
+    """
+    Decorator to retry git operations on transient failures.
+    
+    Args:
+        max_attempts: Maximum number of retry attempts
+        delay: Initial delay between retries in seconds
+        backoff: Multiplier for delay (exponential backoff)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            last_exception = None
+            
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except GitCommandError as e:
+                    last_exception = e
+                    if attempt < max_attempts - 1:
+                        logger.warning(
+                            f"Git operation failed (attempt {attempt + 1}/{max_attempts}): {e}. "
+                            f"Retrying in {current_delay}s..."
+                        )
+                        time.sleep(current_delay)
+                        current_delay *= backoff
+                    else:
+                        logger.error(f"Git operation failed after {max_attempts} attempts: {e}")
+                        raise
+                except Exception as e:
+                    # Non-retryable error
+                    logger.error(f"Non-retryable error in git operation: {e}")
+                    raise
+            
+            # Should not reach here, but just in case
+            if last_exception:
+                raise last_exception
+        
+        return wrapper
+    return decorator
 
 
 class RunbookVersionControl:
@@ -53,6 +100,7 @@ class RunbookVersionControl:
             email="runbook-bot@runbooks.local"
         )
     
+    @retry_on_git_error(max_attempts=3, delay=1.0, backoff=2.0)
     def commit_annotation(
         self,
         runbook_path: str,
@@ -62,39 +110,39 @@ class RunbookVersionControl:
     ) -> str:
         """
         Append annotation and commit to git.
-        
+
         Args:
             runbook_path: Path to runbook YAML
             annotation: Annotation to append
             author: Optional human author name
             commit_message: Optional custom commit message
-        
+
         Returns:
             Commit hash
         """
         runbook_file = self.repo_path / runbook_path
-        
+
         if not runbook_file.exists():
             raise FileNotFoundError(f"Runbook not found: {runbook_file}")
-        
+
         # Append annotation
         self._append_annotation(runbook_file, annotation)
-        
+
         # Create commit message
         if commit_message:
             msg = commit_message
         else:
             msg = self._build_commit_message(annotation, author)
-        
+
         # Stage and commit
         self.repo.index.add([str(runbook_file)])
-        
+
         commit = self.repo.index.commit(
             msg,
             author=self.actor if not author else Actor(author, f"{author}@runbooks.local"),
             committer=self.actor
         )
-        
+
         return commit.hexsha
     
     def _append_annotation(self, runbook_file: Path, annotation: Dict[str, Any]):
